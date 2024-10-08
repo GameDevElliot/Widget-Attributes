@@ -24,6 +24,15 @@ public class WidgetAttributesEditor : Editor
     #endregion
     private void OnSceneGUI()
     {
+        //Apply default style
+        lineColor = new Color(1,0,0,1);
+        fillColor = new Color(1,0,0,0.25f);
+        labelBackgroundColor = new Color(1,1,1,1);
+        labelTextColor = new Color(0,0,0,1);
+        handleColor = new Color(1,1,0,1);
+        labelScreenOffset = new Vector3(0,-0.25f,0);
+
+
         // Get all fields in the MonoBehaviour type
         fieldInfos = target.GetType().GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
         monoBehaviour = (MonoBehaviour)target;
@@ -118,9 +127,9 @@ public class WidgetAttributesEditor : Editor
         {
             return;
         }
-        Space space = target is MonoBehaviour && widgetAttribute.space==Space.Self? Space.Self : Space.World;
+        space = target is MonoBehaviour && widgetAttribute.space==Space.Self? Space.Self : Space.World;
 
-        if(space == Space.World)
+        if(space == Space.Self)
         {
             vectorValue = (target as MonoBehaviour).transform.TransformPoint(vectorValue);
         }
@@ -128,7 +137,7 @@ public class WidgetAttributesEditor : Editor
         EditorGUI.BeginChangeCheck();
         Vector3 newVectorValue = Handles.PositionHandle(vectorValue, Quaternion.identity);
 
-        if(space == Space.World)
+        if(space == Space.Self)
         {
             newVectorValue = (target as MonoBehaviour).transform.InverseTransformPoint(newVectorValue);
         }
@@ -291,7 +300,7 @@ public class WidgetAttributesEditor : Editor
         Vector3 point = (Vector3)fieldInfo.GetValue(target);
 
         if(labelSpace == Space.Self){
-            point = monoBehaviour.transform.InverseTransformPoint(point);
+            point = monoBehaviour.transform.TransformPoint(point);
         }
 
         string name = labelAttribute.labelName?? fieldInfo.Name;
@@ -306,14 +315,12 @@ public class WidgetAttributesEditor : Editor
         Handles.color = lineColor;
         Vector3 direction = endPoint - startPoint;
         Handles.DrawLine(startPoint, endPoint, thickness);
-        //Handles.ArrowHandleCap(0,startPoint,Quaternion.LookRotation(direction),1,EventType.Repaint);
-
 
         Vector3 arrowHeadBase = startPoint + direction/2;
-
-        // Define the arrowhead width
-        Vector3 arrowHeadLeft = Quaternion.Euler(0, 0, 135) * direction.normalized * 2f;
-        Vector3 arrowHeadRight = Quaternion.Euler(0, 0, 225) * direction.normalized * 2f;
+        float sizeModifier = HandleUtility.GetHandleSize(arrowHeadBase)/3;
+        // Arrow Head End Points
+        Vector3 arrowHeadLeft = Quaternion.Euler(0, 0, 135) * direction.normalized * sizeModifier;
+        Vector3 arrowHeadRight = Quaternion.Euler(0, 0, 225) * direction.normalized * sizeModifier;
 
         // Draw arrowhead
         Handles.DrawLine(arrowHeadBase, arrowHeadBase + arrowHeadLeft, thickness);
