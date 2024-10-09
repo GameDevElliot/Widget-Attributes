@@ -3,29 +3,34 @@ using UnityEngine;
 
 namespace WidgetAttributes
 {
-    // Widget Attribute
-    //
-    // Use it on a Vector2, Vector3 or Rect field. 
-    // It will draw a location handle in the scene, at the location of the Vector or Rect.
-    // Use 'space' to specify weather to draw it at the transform's local position or the world position.
-
-
+    /// <summary>
+    /// Widget Attribute.
+    /// </summary>
+    /// <remarks>
+    /// Use this attribute on a Vector2, Vector3, or Rect field.
+    /// It will draw a location handle in the scene at the position of the Vector or Rect.
+    /// Use the 'space' parameter to specify whether to draw the handle at the transform's local position or world position.
+    /// </remarks>
     [AttributeUsage(AttributeTargets.Field)]
     public class WidgetAttribute : PropertyAttribute
     {
         public Space space = Space.World;
+
+        /// <param name="space">Specifies the space for drawing the widget handle (local or world, defaults to World).</param>
         public WidgetAttribute(Space space = Space.World)
         {
             this.space = space;
         }
     }
-    // ArrowTo Attribute.
-    //
-    // Use it to draw an arrow from the Vector3 field to the specified point.
-    //
-    // use "nameof()" for safty.
-    // Use 'space' to specify weather to draw it at the transform's local position or the world position.
 
+    /// <summary>
+    /// ArrowTo Attribute.
+    /// </summary>
+    /// <remarks>
+    /// Use this attribute to draw an arrow from the Vector3 field to the specified point.
+    /// Use "nameof()" for safety when referencing the target.
+    /// Use 'space' to specify whether to draw it at the transform's local or world position.
+    /// </remarks>
     [AttributeUsage(AttributeTargets.Field)]
     public class ArrowToAttribute : PropertyAttribute
     {
@@ -34,40 +39,46 @@ namespace WidgetAttributes
         public Space endPointSpace;
         public bool isRelativeEndPoint;
 
-        public ArrowToAttribute(string endPointName,bool isRelativeEndPoint = false, Space startPointSpace = Space.World, Space endPointSpace = Space.World)
+        /// <param name="endPointName">The name of the end point (use "nameof()" for safety).</param>
+        /// <param name="isRelativeEndPoint">Indicates whether the end point is relative to the current transform (defaults to false).</param>
+        /// <param name="startPointSpace">The coordinate space of the start point (defaults to World).</param>
+        /// <param name="endPointSpace">The coordinate space of the end point (defaults to World).</param>
+        public ArrowToAttribute(string endPointName, bool isRelativeEndPoint = false, Space startPointSpace = Space.World, Space endPointSpace = Space.World)
         {
             this.endPointName = endPointName;
             this.isRelativeEndPoint = isRelativeEndPoint;
             this.startPointSpace = startPointSpace;
             this.endPointSpace = endPointSpace;
         }
-
     }
 
-    // Label Attribute. Use it to mark A Vector3 with a label
-    //
-    // If a space is not specified, space will be inherited from a WidgetAttribute or an ArrowAttribute on the same field.
-    // Otherwise space defaults to World.
-
+    /// <summary>
+    /// Label Attribute.
+    /// </summary>
+    /// <remarks>
+    /// Use this attribute to mark a Vector3 field with a label in the scene.
+    /// If 'space' is not specified, it will inherit from a WidgetAttribute or ArrowToAttribute on the same field.
+    /// Otherwise, the space defaults to World.
+    /// </remarks>
     [AttributeUsage(AttributeTargets.Field)]
     public class LabelAttribute : PropertyAttribute
     {
         public string labelName;
         public Space? space;
-        // public float xOffset;
-        // public float yOffset;
-        // public float zOffset;
-        public LabelAttribute(Space space,string labelName=null)
+
+        /// <param name="space">The coordinate space for the label (optional).</param>
+        /// <param name="labelName">The name of the label to display (optional).</param>
+        public LabelAttribute(Space space, string labelName = null)
         {
             this.space = space;
             this.labelName = labelName;
-
         }
-        public LabelAttribute(string labelName=null)
+
+        /// <param name="labelName">The name of the label to display (optional).</param>
+        public LabelAttribute(string labelName = null)
         {
             this.space = null;
             this.labelName = labelName;
-
         }
     }
 }

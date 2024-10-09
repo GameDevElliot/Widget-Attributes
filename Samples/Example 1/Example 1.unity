@@ -239,9 +239,9 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1618433170}
   serializedVersion: 2
-  m_LocalRotation: {x: -0.15062004, y: -0.37214297, z: -0.34361076, w: 0.84897286}
-  m_LocalPosition: {x: -3.36, y: -1.75, z: -7.37}
-  m_LocalScale: {x: 0.98571396, y: 0.9537991, z: 0.9832184}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: -2.264, y: -1.16, z: -4.95}
+  m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 1709766882}
@@ -258,8 +258,8 @@ Light:
   m_Type: 2
   m_Shape: 0
   m_Color: {r: 1, g: 1, b: 1, a: 1}
-  m_Intensity: 1
-  m_Range: 20
+  m_Intensity: 5
+  m_Range: 10
   m_SpotAngle: 30
   m_InnerSpotAngle: 21.80208
   m_CookieSize: 10
@@ -339,21 +339,21 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 56bb2268b2f12c349a48b78ac000e459, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  startPoint: {x: -7.3058805, y: 2.6822162, z: 0}
-  end: {x: -4.2609887, y: -0.36357987, z: 0}
-  localPoint: {x: 3.4151282, y: -0.4348255, z: 5.9851213}
+  startPoint: {x: -5.5474997, y: 2.3607917, z: -3.9211035}
+  end: {x: -3.4479742, y: -1.0631505, z: 2.5389724}
+  localPoint: {x: -1.54, y: 0, z: 0}
   rect:
     serializedVersion: 2
-    x: -3.2045264
-    y: -4.7866297
+    x: -2.4293263
+    y: -4.673186
     width: 6
     height: 2.5822487
   rect2:
     serializedVersion: 2
-    x: 3.5215096
-    y: -2.5398626
-    width: 5.584841
-    height: 3.886865
+    x: -1.56
+    y: -3.65
+    width: 2.4694076
+    height: 1.6874225
 --- !u!4 &1709766882
 Transform:
   m_ObjectHideFlags: 0
@@ -362,14 +362,14 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1709766880}
   serializedVersion: 2
-  m_LocalRotation: {x: 0.15062004, y: 0.37214297, z: 0.34361076, w: 0.84897286}
+  m_LocalRotation: {x: 0.26929507, y: 0.04554785, z: 0.9485085, w: 0.16042821}
   m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 0.78, y: 1.57, z: 1}
+  m_LocalScale: {x: 2, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 1618433171}
   m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 47.34, z: 44.07}
+  m_LocalEulerAnglesHint: {x: 0, y: 31.7, z: 160.8}
 --- !u!33 &1709766883
 MeshFilter:
   m_ObjectHideFlags: 0
