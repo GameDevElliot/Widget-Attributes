@@ -341,19 +341,19 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   startPoint: {x: -5.5474997, y: 2.3607917, z: -3.9211035}
   end: {x: -3.4479742, y: -1.0631505, z: 2.5389724}
-  localPoint: {x: -1.54, y: 0, z: 0}
+  localPoint: {x: -2.0820782, y: -1.4417324, z: -0.31949124}
   rect:
     serializedVersion: 2
-    x: -2.4293263
-    y: -4.673186
-    width: 6
-    height: 2.5822487
+    x: -1.2711036
+    y: -4.0731993
+    width: 3.640898
+    height: 1.4675931
   rect2:
     serializedVersion: 2
-    x: -1.56
-    y: -3.65
-    width: 2.4694076
-    height: 1.6874225
+    x: -1.2345041
+    y: -3.409912
+    width: 2.520335
+    height: 1.8255051
 --- !u!4 &1709766882
 Transform:
   m_ObjectHideFlags: 0
@@ -364,7 +364,7 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0.26929507, y: 0.04554785, z: 0.9485085, w: 0.16042821}
   m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 2, y: 1, z: 1}
+  m_LocalScale: {x: 2, y: 2, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 1618433171}

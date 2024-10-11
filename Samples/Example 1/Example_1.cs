@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Collections.Generic;
+using UnityEditor;
 using UnityEngine;
 using WidgetAttributes;
 
@@ -26,5 +27,5 @@ public class Example_1 : MonoBehaviour
     [FillColor(0.9f,0.9f,0.9f,0.25f)]
     [SerializeField, Widget(Space.Self)]
     private Rect rect2 = new Rect(5,5,6,4);
-    
+ 
 }

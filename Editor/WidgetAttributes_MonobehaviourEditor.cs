@@ -79,17 +79,22 @@ public class WidgetAttributesEditor : Editor
     }
     private void ProcessFieldAttributes(FieldInfo fieldInfo)
     {
+        
         WidgetAttribute widgetAttribute = fieldInfo.GetCustomAttribute<WidgetAttribute>();
+        space = widgetAttribute.space;
+        Transform transform =  (target as MonoBehaviour)?.transform;
+        Quaternion widgetRotation = space == Space.Self && Tools.pivotRotation==PivotRotation.Local? transform.rotation : Quaternion.identity;
+
         if(widgetAttribute != null)
         {
             if(fieldInfo.FieldType == typeof(Vector3) || fieldInfo.FieldType == typeof(Vector2))
             {
-                ProcessLocationWidget(widgetAttribute,fieldInfo);
+                ProcessLocationWidget(fieldInfo,widgetRotation);
             } 
 
             else if(fieldInfo.FieldType == typeof(Rect))
             {
-                ProcessRectWidget(widgetAttribute,fieldInfo);
+                ProcessRectWidget(fieldInfo,widgetRotation);
             }
         }
         ArrowToAttribute arrowAttribute = fieldInfo.GetCustomAttribute<ArrowToAttribute>();
@@ -112,7 +117,7 @@ public class WidgetAttributesEditor : Editor
     }
   
 
-    private void ProcessLocationWidget(WidgetAttribute widgetAttribute, FieldInfo fieldInfo)
+    private void ProcessLocationWidget(FieldInfo fieldInfo, Quaternion widgetRotation)
     {
         Vector3 vectorValue;
         if(fieldInfo.FieldType == typeof(Vector3))
@@ -127,15 +132,22 @@ public class WidgetAttributesEditor : Editor
         {
             return;
         }
-        space = target is MonoBehaviour && widgetAttribute.space==Space.Self? Space.Self : Space.World;
-
+        Transform transform =  (target as MonoBehaviour)?.transform;
+        
         if(space == Space.Self)
         {
-            vectorValue = (target as MonoBehaviour).transform.TransformPoint(vectorValue);
+            vectorValue = transform.TransformPoint(vectorValue);
         }
+
+        
+
         // Draw the position handle
         EditorGUI.BeginChangeCheck();
-        Vector3 newVectorValue = Handles.PositionHandle(vectorValue, Quaternion.identity);
+
+        Vector3 newVectorValue;
+        newVectorValue = Handles.PositionHandle(vectorValue, widgetRotation);
+
+
 
         if(space == Space.Self)
         {
@@ -184,9 +196,9 @@ public class WidgetAttributesEditor : Editor
         }
         DrawArrow(startPoint, endPoint);        
     }
-    private void ProcessRectWidget(WidgetAttribute widgetAttribute, FieldInfo fieldInfo)
+    private void ProcessRectWidget(FieldInfo fieldInfo, Quaternion widgetRotation)
     {
-        space = widgetAttribute.space;
+
 
         Rect rect = (Rect)fieldInfo.GetValue(target);
         float size = HandleUtility.GetHandleSize(Vector3.zero) / 8;
@@ -202,7 +214,9 @@ public class WidgetAttributesEditor : Editor
         Vector3 right = new Vector3(rect.xMax, center.y, 0);
         Vector3 top = new Vector3(center.x, rect.yMax, 0);
         Vector3 bottom = new Vector3(center.x, rect.yMin, 0);
-        Vector3 scale = new Vector3(rect.width,rect.height,1);  
+        float width =  rect.width;
+        float height = rect.height;
+        Vector3 scale = new Vector3(width,height,1);
 
         // Convert to world space if needed.
         if (space == Space.Self)
@@ -216,7 +230,8 @@ public class WidgetAttributesEditor : Editor
             right = monoBehaviour.transform.TransformPoint(right);
             top = monoBehaviour.transform.TransformPoint(top);
             bottom = monoBehaviour.transform.TransformPoint(bottom);
-            scale = Vector3.Scale(scale,monoBehaviour.transform.localScale);
+            width *= monoBehaviour.transform.localScale.x;
+            height *= monoBehaviour.transform.localScale.y;
         }
         Handles.color = handleColor;
         // Draw and move the handles
@@ -230,7 +245,7 @@ public class WidgetAttributesEditor : Editor
         Vector3 newRight = Handles.FreeMoveHandle(right, size, snap, capFunction);
         Vector3 newTop = Handles.FreeMoveHandle(top, size, snap, capFunction);
         Vector3 newBottom = Handles.FreeMoveHandle(bottom, size, snap, capFunction);
-        Vector3 newScale = Handles.ScaleHandle(new Vector3(rect.width, rect.height, 1f), center, space == Space.World ? Quaternion.identity : monoBehaviour.transform.rotation, size * 5f);
+        Vector3 newScale = Handles.ScaleHandle(new Vector3(width, height, 1f), center, space == Space.World ? Quaternion.identity : monoBehaviour.transform.rotation, size * 5f);
 
 
         if (EditorGUI.EndChangeCheck())
@@ -280,8 +295,9 @@ public class WidgetAttributesEditor : Editor
             else if (newScale!= scale)
             {
                 Vector2 tempCenter = rect.center;
-                rect.width = space == Space.World ? newScale.x : Vector3Extentions.UnScale(newScale, monoBehaviour.transform.localScale).x;
                 rect.height = space == Space.World ? newScale.y : Vector3Extentions.UnScale(newScale,monoBehaviour.transform.localScale).y;
+                rect.width = space == Space.World ? newScale.x : Vector3Extentions.UnScale(newScale, monoBehaviour.transform.localScale).x;
+
                 rect.center = tempCenter;
             }
 
@@ -316,8 +332,10 @@ public class WidgetAttributesEditor : Editor
         Vector3 direction = endPoint - startPoint;
         Handles.DrawLine(startPoint, endPoint, thickness);
 
+        // Arrow Head Start Point half way.
         Vector3 arrowHeadBase = startPoint + direction/2;
         float sizeModifier = HandleUtility.GetHandleSize(arrowHeadBase)/3;
+        
         // Arrow Head End Points
         Vector3 arrowHeadLeft = Quaternion.Euler(0, 0, 135) * direction.normalized * sizeModifier;
         Vector3 arrowHeadRight = Quaternion.Euler(0, 0, 225) * direction.normalized * sizeModifier;

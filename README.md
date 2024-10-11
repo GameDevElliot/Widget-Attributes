@@ -1,7 +1,9 @@
-Note: This tool is still in the early stages of development.
+Note: This tool is still in the early stages of development. Changes in near-future versions may occur which may affect the compilation of your scripts
 # Unity Widget-Attributes
 
 Use attributes to create widgets and labels ("handles") in the scene view, to visualise and manipulate data in the Scene View.
+Handles are by no means, a new thing, and neither is using them inside of a monobehaviour, but they normally not interactable unless they are inside of a custom editor.
+The intention of Widget-Attributes is to save you time and energy, by making it easy to create interactable widgets in your scene without having to write a custom editor for each script.
 
 Instructions:
 
