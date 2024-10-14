@@ -4,6 +4,8 @@ using System.Reflection;
 using WidgetAttributes;
 using WidgetAttributesUtillities;
 using System;
+using Unity.Mathematics;
+using UnityEngine.Jobs;
 
 [CustomEditor(typeof(MonoBehaviour), true)]
 public class WidgetAttributesEditor : Editor
@@ -79,7 +81,7 @@ public class WidgetAttributesEditor : Editor
     }
     private void ProcessFieldAttributes(FieldInfo fieldInfo)
     {
-        
+        object value = fieldInfo.GetValue(target);
         WidgetAttribute widgetAttribute = fieldInfo.GetCustomAttribute<WidgetAttribute>();
         space = widgetAttribute.space;
         Transform transform =  (target as MonoBehaviour)?.transform;
@@ -87,12 +89,12 @@ public class WidgetAttributesEditor : Editor
 
         if(widgetAttribute != null)
         {
-            if(fieldInfo.FieldType == typeof(Vector3) || fieldInfo.FieldType == typeof(Vector2))
+            if(value is Vector3 or Vector2 or float3 or float2 or Vector3Int or Vector2Int)
             {
                 ProcessLocationWidget(fieldInfo,widgetRotation);
             } 
 
-            else if(fieldInfo.FieldType == typeof(Rect))
+            else if(value is Rect)
             {
                 ProcessRectWidget(fieldInfo,widgetRotation);
             }
@@ -100,7 +102,7 @@ public class WidgetAttributesEditor : Editor
         ArrowToAttribute arrowAttribute = fieldInfo.GetCustomAttribute<ArrowToAttribute>();
         if (arrowAttribute != null)
         {
-            if(fieldInfo.FieldType == typeof(Vector3))
+            if(value is Vector3 or Vector2 or float3 or float2 or Vector3Int or Vector2Int)
             {
                 ProcessArrowWidget(arrowAttribute,fieldInfo);
             }
@@ -108,7 +110,7 @@ public class WidgetAttributesEditor : Editor
         LabelAttribute labelAttribute = fieldInfo.GetCustomAttribute<LabelAttribute>();
         if (labelAttribute != null)
         {
-            if(fieldInfo.FieldType == typeof(Vector3))
+            if(value is Vector3 or Vector2 or float3 or float2 or Vector3Int or Vector2Int)
             {
                 ProcessLabelWidget(labelAttribute,fieldInfo);
             }
@@ -119,21 +121,10 @@ public class WidgetAttributesEditor : Editor
 
     private void ProcessLocationWidget(FieldInfo fieldInfo, Quaternion widgetRotation)
     {
-        Vector3 vectorValue;
-        if(fieldInfo.FieldType == typeof(Vector3))
-        {
-            vectorValue = (Vector3)fieldInfo.GetValue(target);
-        } 
-        else if(fieldInfo.FieldType == typeof(Vector2))
-        {
-            vectorValue = (Vector2)fieldInfo.GetValue(target);
-        } 
-        else 
-        {
-            return;
-        }
-        Transform transform =  (target as MonoBehaviour)?.transform;
+        Vector3 vectorValue = new Vector3();
+        if(TryUpdateVector3FromField(fieldInfo,target,ref vectorValue) == false) return;
         
+        Transform transform =  (target as MonoBehaviour)?.transform;
         if(space == Space.Self)
         {
             vectorValue = transform.TransformPoint(vectorValue);
@@ -156,19 +147,14 @@ public class WidgetAttributesEditor : Editor
         if (EditorGUI.EndChangeCheck())
         {
             Undo.RecordObject(target, "Move Handle");
-            if(fieldInfo.FieldType == typeof(Vector3))
-            {
-                fieldInfo.SetValue(target, newVectorValue);
-            } 
-            else if(fieldInfo.FieldType == typeof(Vector2))
-            {
-                fieldInfo.SetValue(target, (Vector2)newVectorValue);
-            }
+            TrySetFieldFromVector3(fieldInfo,target,newVectorValue);
         }
     }
     private void ProcessArrowWidget(ArrowToAttribute arrowAttribute, FieldInfo fieldInfo)
     {
-        Vector3 startPoint = (Vector3)fieldInfo.GetValue(monoBehaviour);
+        Vector3 startPoint = new Vector3();
+        if(TryUpdateVector3FromField(fieldInfo,target,ref startPoint) == false) return;
+
         if(arrowAttribute.startPointSpace==Space.Self)
         {
             startPoint = monoBehaviour.transform.TransformPoint(startPoint);
@@ -177,11 +163,13 @@ public class WidgetAttributesEditor : Editor
         // Get the end point using the name provided in the attribute
         FieldInfo endPointField = monoBehaviour.GetType().GetField(arrowAttribute.endPointName, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
         
-        if (endPointField == null || endPointField.FieldType != typeof(Vector3))
+        if (endPointField == null)
         {
             return;
         }
-        Vector3 endPoint = (Vector3)endPointField.GetValue(monoBehaviour);
+        Vector3 endPoint = new Vector3();
+        if (TryUpdateVector3FromField(endPointField, target, ref endPoint) == false) return;
+
         if(arrowAttribute.endPointSpace==Space.Self && !arrowAttribute.isRelativeEndPoint)
         {
             endPoint = monoBehaviour.transform.TransformPoint(endPoint);
@@ -313,7 +301,8 @@ public class WidgetAttributesEditor : Editor
     private void ProcessLabelWidget(LabelAttribute labelAttribute, FieldInfo fieldInfo)
     {
         Space labelSpace = labelAttribute.space?? space;
-        Vector3 point = (Vector3)fieldInfo.GetValue(target);
+        Vector3 point = new Vector3();
+        if(TryUpdateVector3FromField(fieldInfo,target,ref point) == false) return;
 
         if(labelSpace == Space.Self){
             point = monoBehaviour.transform.TransformPoint(point);
@@ -344,4 +333,85 @@ public class WidgetAttributesEditor : Editor
         Handles.DrawLine(arrowHeadBase, arrowHeadBase + arrowHeadLeft, thickness);
         Handles.DrawLine(arrowHeadBase, arrowHeadBase + arrowHeadRight, thickness);
     }
+
+    #region Helper Methods
+    private bool TryUpdateVector3FromField(FieldInfo fieldInfo, object target, ref Vector3 vector)
+    {
+        object value = fieldInfo.GetValue(target);
+        if (value is Vector3 vec3)
+        {
+            vector = vec3;
+            return true;
+        }
+        else if (value is Vector2 vec2)
+        {
+            vector = (Vector3)vec2;
+            return true;
+        }
+        else if (value is float2 float2)
+        {
+
+            vector.x = float2.x;
+            vector.y = float2.y;
+            return true;
+        }
+        else if (value is float3 float3)
+        {
+            vector = (Vector3)float3;
+            return true;
+        }
+        else if (value is Vector3Int vec3int)
+        {
+            vector = (Vector3)vec3int;
+            return true;
+        }
+        else if (value is Vector2Int vec2int)
+        {
+            vector = (Vector3)(Vector2)vec2int;
+            return true;
+        }
+        // If the field is not supported
+        return false;
+    }
+    private void TrySetFieldFromVector3(FieldInfo fieldInfo, object target, Vector3 vector)
+    {
+
+        object value = fieldInfo.GetValue(target);
+
+        if (value is Vector3)
+        {
+            fieldInfo.SetValue(target, vector);
+        }
+        else if (value is Vector2)
+        {
+            fieldInfo.SetValue(target, (Vector2)vector);
+        }
+        else if (value is float2)
+        {
+            
+            float2 float2Value = new float2(vector.x, vector.y);
+            fieldInfo.SetValue(target, float2Value);
+        }
+        else if (value is float3)
+        {
+            fieldInfo.SetValue(target, (float3)vector);
+        }
+        else if (value is Vector3Int vec3int)
+        {
+            vec3int.x = Mathf.RoundToInt(vector.x);
+            vec3int.y = Mathf.RoundToInt(vector.y);
+            vec3int.z =Mathf.RoundToInt(vector.z);
+
+            fieldInfo.SetValue(target, vec3int);
+        }
+        else if (value is Vector2Int vec2int)
+        {
+            vec2int.x = Mathf.RoundToInt(vector.x);
+            vec2int.y = Mathf.RoundToInt(vector.y);
+            
+            fieldInfo.SetValue(target, vec2int);
+        }
+    }
+
+    #endregion
 }

@@ -1,12 +1,12 @@
 using System.Collections;
 using System.Collections.Generic;
-using UnityEditor;
 using UnityEngine;
 using WidgetAttributes;
 
 public class Example_1 : MonoBehaviour
 {
-
+    [SerializeField, Widget] 
+    private Vector2 vec2 = new Vector2(0,6);
     
     [SerializeField, Widget,Label,ArrowTo(nameof(end))]
     private Vector3 startPoint = new Vector3(0,0,0);
@@ -16,8 +16,10 @@ public class Example_1 : MonoBehaviour
     private Vector3 end = new Vector3(4,4,0);
 
 
+
     [SerializeField, Widget(Space.Self),Label("Local Point")]
     private Vector3 localPoint = new Vector3(0,0,0);
+
 
 
     [SerializeField, Widget] 
