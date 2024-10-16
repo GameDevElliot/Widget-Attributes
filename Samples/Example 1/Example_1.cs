@@ -16,13 +16,16 @@ public class Example_1 : MonoBehaviour
     private Vector3 end = new Vector3(4,4,0);
 
 
+    [LabelBackgroundColor(1,1,0)]
+
+    [LabelTextColor(1,0,1)]    
 
     [SerializeField, Widget(Space.Self),Label("Local Point")]
     private Vector3 localPoint = new Vector3(0,0,0);
 
 
 
-    [SerializeField, Widget] 
+    [SerializeField, Widget,Label("Rect #1")] 
     private Rect rect = new Rect(0,0,6,4);
 
 

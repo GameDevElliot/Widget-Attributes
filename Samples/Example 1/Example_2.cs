@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using Unity.Mathematics;
 using UnityEngine;
 using WidgetAttributes;
+using WidgetAttributes.Primitives;
 
 public class Example_2 : MonoBehaviour
 {
@@ -20,5 +21,7 @@ public class Example_2 : MonoBehaviour
 
     [SerializeField, Widget(Space.Self),Label] 
     private Vector2Int localVec2int = new Vector2Int();
- 
+
+    [SerializeField, Widget(Space.Self)] TransformData transformData;
+
 }

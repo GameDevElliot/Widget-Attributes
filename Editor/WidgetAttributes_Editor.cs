@@ -3,14 +3,17 @@ using UnityEditor;
 using System.Reflection;
 using WidgetAttributes;
 using WidgetAttributesUtillities;
-using System;
 using Unity.Mathematics;
-using UnityEngine.Jobs;
+using WidgetAttributes.Primitives;
+using System.Collections.Generic;
+using System;
+using System.Collections;
 
 [CustomEditor(typeof(MonoBehaviour), true)]
 public class WidgetAttributesEditor : Editor
 {
     MonoBehaviour monoBehaviour;
+    Transform transform;
     FieldInfo[] fieldInfos;
     Space space = Space.World;
 
@@ -18,7 +21,8 @@ public class WidgetAttributesEditor : Editor
     private float thickness = 1;
     private Color lineColor = new Color(1,0,0,1);
     private Color fillColor = new Color(1,0,0,0.25f);  
-    private Color labelBackgroundColor = new Color(1,1,1,1);
+    private Texture2D labelBackgroundTexture;
+    private Dictionary<Color,Texture2D> labelBackgroundTextureCache = new Dictionary<Color, Texture2D>();
     private Color labelTextColor = new Color(0,0,0,1);
     private Color handleColor = new Color(1,1,0,1);
     private Vector3 labelScreenOffset = new Vector3(0,-0.25f,0);
@@ -26,111 +30,173 @@ public class WidgetAttributesEditor : Editor
     #endregion
     private void OnSceneGUI()
     {
+        monoBehaviour = (MonoBehaviour)target;
+        transform =  monoBehaviour.transform;
+        fieldInfos = target.GetType().GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+
         //Apply default style
         lineColor = new Color(1,0,0,1);
         fillColor = new Color(1,0,0,0.25f);
-        labelBackgroundColor = new Color(1,1,1,1);
+        labelBackgroundTexture = Texture2D.whiteTexture;
         labelTextColor = new Color(0,0,0,1);
         handleColor = new Color(1,1,0,1);
         labelScreenOffset = new Vector3(0,-0.25f,0);
 
-
-        // Get all fields in the MonoBehaviour type
-        fieldInfos = target.GetType().GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
-        monoBehaviour = (MonoBehaviour)target;
         foreach (FieldInfo fieldInfo in fieldInfos)
         {
-            space = Space.World;
-            ProcessStyleAttributes(fieldInfo);
-            ProcessFieldAttributes(fieldInfo);
+            object value = fieldInfo.GetValue(target);
+            IEnumerable<Attribute> attributes = fieldInfo.GetCustomAttributes();
+
+            foreach (Attribute attribute in attributes)
+            {
+                switch(attribute)
+                {
+                    case ThicknessAttribute thicknessAttribute:
+                        thickness = thicknessAttribute.thickness;
+                        break;
+
+                    case FillColorAttribute fillColorAttribute:
+                        fillColor = new Color(fillColorAttribute.red, fillColorAttribute.green, fillColorAttribute.blue, fillColorAttribute.alpha);
+                        break;
+
+                    case LineColorAttribute lineColorAttribute:
+                        lineColor = new Color(lineColorAttribute.red, lineColorAttribute.green, lineColorAttribute.blue,lineColorAttribute.alpha);
+                        break;
+
+                    case LabelBackgroundColorAttribute labelBackgroundColorAttribute:
+                        labelBackgroundTexture = CreateSolidColorTexture(new Color(labelBackgroundColorAttribute.red, labelBackgroundColorAttribute.green, labelBackgroundColorAttribute.blue, labelBackgroundColorAttribute.alpha));
+                        break;
+
+                    case LabelTextColorAttribute labelTextColorAttribute:
+                        labelTextColor = new Color(labelTextColorAttribute.red, labelTextColorAttribute.green, labelTextColorAttribute.blue, labelTextColorAttribute.alpha);
+                        break;
+
+                    case LabelScreenOffsetAttribute labelScreenOffsetAttribute:
+                        labelScreenOffset = new Vector3(labelScreenOffsetAttribute.x, labelScreenOffsetAttribute.y, labelScreenOffsetAttribute.z);
+                        break;
+
+                    case WidgetAttribute widgetAttribute:
+                        space = widgetAttribute.space;
+                        Quaternion widgetRotationBase = space == Space.Self && Tools.pivotRotation==PivotRotation.Local? transform.rotation : Quaternion.identity;
+
+                        // if(value is IEnumerable)
+                        // {
+                        //     foreach(var item in (IEnumerable)value){
+
+                        //     }
+                        // }
+                        switch(value)
+                        {
+                            case IWidgetLocation:
+                                if(Tools.current==Tool.Move)
+                                {
+                                    ProcessLocationWidget(fieldInfo,widgetRotationBase);
+                                }
+                                else if(Tools.current==Tool.Rotate && value is IWidgetRotation)
+                                {
+                                    ProcessRotationWidget(fieldInfo,widgetRotationBase);
+                                }
+                                // else if(Tools.current==Tool.Scale && value is IWidgetRotation)
+                                // {
+                                //     ProcessScaleWidget(fieldInfo,widgetRotation);
+                                // }
+                                break;
+                            
+                            case Vector3 or Vector2 or float3 or float2 or Vector3Int or Vector2Int:
+                                ProcessLocationWidget(fieldInfo,widgetRotationBase);
+                                break;
+
+                            case Rect:
+                                ProcessRectWidget(fieldInfo,widgetRotationBase);
+                                break;
+
+                            case TransformData:
+                                ProcessTransformWidget(fieldInfo);
+                                break;
+
+                            case Circle:
+                                //ProcessCircleWidget(fieldInfo);
+                                break;
+                        }
+                        break;
+                    case ArrowToAttribute arrowToAttribute:
+                        if(value is Vector3 or Vector2 or float3 or float2 or Vector3Int or Vector2Int or Rect)
+                        {
+                            ProcessArrowWidget(arrowToAttribute,fieldInfo);
+                        }
+                        break;
+                    case LabelAttribute labelAttribute:
+                        if(value is IWidgetLocation or Vector3 or Vector2 or float3 or float2 or Vector3Int or Vector2Int or Rect)
+                        {
+                            ProcessLabelWidget(labelAttribute,fieldInfo);
+                        }
+                        break;
+                }
+            }
         }
     }
 
-    private void ProcessStyleAttributes(FieldInfo fieldInfo)
-    {
-        ThicknessAttribute thicknessAttribute = fieldInfo.GetCustomAttribute<ThicknessAttribute>();
-        if (thicknessAttribute != null)
-        {
-            thickness = thicknessAttribute.thickness;
-        }
-        FillColorAttribute fillColorAttribute = fieldInfo.GetCustomAttribute<FillColorAttribute>();
-        if (fillColorAttribute != null)
-        {
-            fillColor = new Color(fillColorAttribute.red, fillColorAttribute.green, fillColorAttribute.blue, fillColorAttribute.alpha);
-        }
-        LineColorAttribute lineColorAttribute = fieldInfo.GetCustomAttribute<LineColorAttribute>();
-        if (lineColorAttribute != null)
-        {
-            lineColor = new Color(lineColorAttribute.red, lineColorAttribute.green, lineColorAttribute.blue, lineColorAttribute.alpha);
-        }
-        LabelBackgroundColorAttribute labelBackgroundColorAttribute = fieldInfo.GetCustomAttribute<LabelBackgroundColorAttribute>();
-        if (labelBackgroundColorAttribute != null)
-        {
-            labelBackgroundColor = new Color(labelBackgroundColorAttribute.red, labelBackgroundColorAttribute.green, labelBackgroundColorAttribute.blue, labelBackgroundColorAttribute.alpha);
-        }
-        LabelTextColorAttribute labelTextColorAttribute = fieldInfo.GetCustomAttribute<LabelTextColorAttribute>();
-        if (labelTextColorAttribute != null)
-        {
-            labelTextColor = new Color(labelTextColorAttribute.red, labelTextColorAttribute.green, labelTextColorAttribute.blue, labelTextColorAttribute.alpha);
-        }
-        LabelScreenOffsetAttribute labelScreenOffsetAttribute = fieldInfo.GetCustomAttribute<LabelScreenOffsetAttribute>();
-        if (labelScreenOffsetAttribute != null)
-        {
-            labelScreenOffset = new Vector3(labelScreenOffsetAttribute.x, labelScreenOffsetAttribute.y, labelScreenOffsetAttribute.z);
-        }
-    }
-    private void ProcessFieldAttributes(FieldInfo fieldInfo)
+    private void ProcessRotationWidget(FieldInfo fieldInfo, Quaternion widgetRotationBase)
     {
         object value = fieldInfo.GetValue(target);
-        WidgetAttribute widgetAttribute = fieldInfo.GetCustomAttribute<WidgetAttribute>();
-        space = widgetAttribute.space;
-        Transform transform =  (target as MonoBehaviour)?.transform;
-        Quaternion widgetRotation = space == Space.Self && Tools.pivotRotation==PivotRotation.Local? transform.rotation : Quaternion.identity;
-
-        if(widgetAttribute != null)
-        {
-            if(value is Vector3 or Vector2 or float3 or float2 or Vector3Int or Vector2Int)
-            {
-                ProcessLocationWidget(fieldInfo,widgetRotation);
-            } 
-
-            else if(value is Rect)
-            {
-                ProcessRectWidget(fieldInfo,widgetRotation);
-            }
-        }
-        ArrowToAttribute arrowAttribute = fieldInfo.GetCustomAttribute<ArrowToAttribute>();
-        if (arrowAttribute != null)
-        {
-            if(value is Vector3 or Vector2 or float3 or float2 or Vector3Int or Vector2Int)
-            {
-                ProcessArrowWidget(arrowAttribute,fieldInfo);
-            }
-        }
-        LabelAttribute labelAttribute = fieldInfo.GetCustomAttribute<LabelAttribute>();
-        if (labelAttribute != null)
-        {
-            if(value is Vector3 or Vector2 or float3 or float2 or Vector3Int or Vector2Int)
-            {
-                ProcessLabelWidget(labelAttribute,fieldInfo);
-            }
-        }        
-
-    }
-  
-
-    private void ProcessLocationWidget(FieldInfo fieldInfo, Quaternion widgetRotation)
-    {
-        Vector3 vectorValue = new Vector3();
-        if(TryUpdateVector3FromField(fieldInfo,target,ref vectorValue) == false) return;
-        
-        Transform transform =  (target as MonoBehaviour)?.transform;
+        Vector3 vectorValue = GetLocationFromField(fieldInfo,target);
+        IWidgetRotation _IWidgetRotation = (IWidgetRotation)value;
+        Quaternion rotation = _IWidgetRotation.GetRotationForWidget() * widgetRotationBase;
         if(space == Space.Self)
         {
             vectorValue = transform.TransformPoint(vectorValue);
         }
-
         
+        // Draw the position handle
+        EditorGUI.BeginChangeCheck();
+
+        Quaternion newRotation = rotation;
+        newRotation = Handles.RotationHandle(newRotation,vectorValue) * Quaternion.Inverse(widgetRotationBase);
+
+        if (EditorGUI.EndChangeCheck())
+        {
+            Undo.RecordObject(target, "Move Handle");
+            _IWidgetRotation.SetRotationfromWidget(newRotation);
+            fieldInfo.SetValue(target, _IWidgetRotation);
+        }
+    }
+
+    private void ProcessTransformWidget(FieldInfo fieldInfo)
+    {
+        TransformData transformDataValue = (TransformData)fieldInfo.GetValue(target);
+
+        if(space == Space.Self) // Convert from local to global coordinates
+        {
+            transformDataValue.position = transform.TransformPoint(transformDataValue.position);
+            transformDataValue.rotation = transform.rotation * transformDataValue.rotation;
+            transformDataValue.scale = Vector3.Scale(transform.lossyScale,transformDataValue.scale);
+        }
+
+        EditorGUI.BeginChangeCheck();
+        Handles.TransformHandle(ref transformDataValue.position,ref transformDataValue.rotation, ref transformDataValue.scale);
+
+        if(space == Space.Self) // Convert back from global to local coordinates
+        {
+            transformDataValue.position = transform.InverseTransformPoint(transformDataValue.position);
+            transformDataValue.rotation = Quaternion.Inverse(transform.rotation) * transformDataValue.rotation;
+            transformDataValue.scale = Vector3Extentions.UnScale(transformDataValue.scale,transform.lossyScale);
+        }
+
+        if (EditorGUI.EndChangeCheck())
+        {
+            Undo.RecordObject(target, "Move Handle");
+            fieldInfo.SetValue(target,transformDataValue);
+        }
+    }
+
+    private void ProcessLocationWidget(FieldInfo fieldInfo, Quaternion widgetRotation)
+    {
+        Vector3 vectorValue = GetLocationFromField(fieldInfo,target);
+        
+        if(space == Space.Self)
+        {
+            vectorValue = transform.TransformPoint(vectorValue);
+        }
 
         // Draw the position handle
         EditorGUI.BeginChangeCheck();
@@ -142,22 +208,21 @@ public class WidgetAttributesEditor : Editor
 
         if(space == Space.Self)
         {
-            newVectorValue = (target as MonoBehaviour).transform.InverseTransformPoint(newVectorValue);
+            newVectorValue = transform.InverseTransformPoint(newVectorValue);
         }
         if (EditorGUI.EndChangeCheck())
         {
             Undo.RecordObject(target, "Move Handle");
-            TrySetFieldFromVector3(fieldInfo,target,newVectorValue);
+            SetLocationFromVector3(fieldInfo,target,newVectorValue);
         }
     }
     private void ProcessArrowWidget(ArrowToAttribute arrowAttribute, FieldInfo fieldInfo)
     {
-        Vector3 startPoint = new Vector3();
-        if(TryUpdateVector3FromField(fieldInfo,target,ref startPoint) == false) return;
+        Vector3 startPoint = GetLocationFromField(fieldInfo,target);
 
         if(arrowAttribute.startPointSpace==Space.Self)
         {
-            startPoint = monoBehaviour.transform.TransformPoint(startPoint);
+            startPoint = transform.TransformPoint(startPoint);
         }
 
         // Get the end point using the name provided in the attribute
@@ -167,12 +232,11 @@ public class WidgetAttributesEditor : Editor
         {
             return;
         }
-        Vector3 endPoint = new Vector3();
-        if (TryUpdateVector3FromField(endPointField, target, ref endPoint) == false) return;
+        Vector3 endPoint = GetLocationFromField(endPointField, target);
 
         if(arrowAttribute.endPointSpace==Space.Self && !arrowAttribute.isRelativeEndPoint)
         {
-            endPoint = monoBehaviour.transform.TransformPoint(endPoint);
+            endPoint = transform.TransformPoint(endPoint);
         }
         else if(arrowAttribute.endPointSpace==Space.World && arrowAttribute.isRelativeEndPoint)
         {
@@ -180,7 +244,7 @@ public class WidgetAttributesEditor : Editor
         }
         else if(arrowAttribute.endPointSpace==Space.Self && arrowAttribute.isRelativeEndPoint)
         {
-            endPoint = startPoint+monoBehaviour.transform.TransformVector(endPoint);
+            endPoint = startPoint+transform.TransformVector(endPoint);
         }
         DrawArrow(startPoint, endPoint);        
     }
@@ -209,17 +273,17 @@ public class WidgetAttributesEditor : Editor
         // Convert to world space if needed.
         if (space == Space.Self)
         {
-            center =  monoBehaviour.transform.TransformPoint(center);
-            topLeft = monoBehaviour.transform.TransformPoint(topLeft);
-            topRight = monoBehaviour.transform.TransformPoint(topRight);
-            bottomLeft = monoBehaviour.transform.TransformPoint(bottomLeft);
-            bottomRight = monoBehaviour.transform.TransformPoint(bottomRight);
-            left = monoBehaviour.transform.TransformPoint(left);
-            right = monoBehaviour.transform.TransformPoint(right);
-            top = monoBehaviour.transform.TransformPoint(top);
-            bottom = monoBehaviour.transform.TransformPoint(bottom);
-            width *= monoBehaviour.transform.localScale.x;
-            height *= monoBehaviour.transform.localScale.y;
+            center =  transform.TransformPoint(center);
+            topLeft = transform.TransformPoint(topLeft);
+            topRight = transform.TransformPoint(topRight);
+            bottomLeft = transform.TransformPoint(bottomLeft);
+            bottomRight = transform.TransformPoint(bottomRight);
+            left = transform.TransformPoint(left);
+            right = transform.TransformPoint(right);
+            top = transform.TransformPoint(top);
+            bottom = transform.TransformPoint(bottom);
+            width *= transform.localScale.x;
+            height *= transform.localScale.y;
         }
         Handles.color = handleColor;
         // Draw and move the handles
@@ -233,7 +297,7 @@ public class WidgetAttributesEditor : Editor
         Vector3 newRight = Handles.FreeMoveHandle(right, size, snap, capFunction);
         Vector3 newTop = Handles.FreeMoveHandle(top, size, snap, capFunction);
         Vector3 newBottom = Handles.FreeMoveHandle(bottom, size, snap, capFunction);
-        Vector3 newScale = Handles.ScaleHandle(new Vector3(width, height, 1f), center, space == Space.World ? Quaternion.identity : monoBehaviour.transform.rotation, size * 5f);
+        Vector3 newScale = Handles.ScaleHandle(new Vector3(width, height, 1f), center, space == Space.World ? Quaternion.identity : transform.rotation, size * 5f);
 
 
         if (EditorGUI.EndChangeCheck())
@@ -242,55 +306,55 @@ public class WidgetAttributesEditor : Editor
 
             if (newCenter != center)
             {
-                rect.center = space == Space.World ? newCenter : monoBehaviour.transform.InverseTransformPoint(newCenter);
+                rect.center = space == Space.World ? newCenter : transform.InverseTransformPoint(newCenter);
             }
             else if (newTopRight != topRight)
             {
-                rect.max = space == Space.World ? newTopRight : monoBehaviour.transform.InverseTransformPoint(newTopRight);
+                rect.max = space == Space.World ? newTopRight : transform.InverseTransformPoint(newTopRight);
             }
             else if (newBottomLeft != bottomLeft)
             {
-                rect.min = space == Space.World ? newBottomLeft : monoBehaviour.transform.InverseTransformPoint(newBottomLeft);
+                rect.min = space == Space.World ? newBottomLeft : transform.InverseTransformPoint(newBottomLeft);
             }
             else if (newTop != top)
             {
-                rect.yMax = space == Space.World ? newTop.y : monoBehaviour.transform.InverseTransformPoint(newTop).y;
+                rect.yMax = space == Space.World ? newTop.y : transform.InverseTransformPoint(newTop).y;
             }
             else if (newBottom != bottom)
             {
-                rect.yMin = space == Space.World ? newBottom.y : monoBehaviour.transform.InverseTransformPoint(newBottom).y;
+                rect.yMin = space == Space.World ? newBottom.y : transform.InverseTransformPoint(newBottom).y;
             }
             else if (newLeft != left)
             {
-                rect.xMin = space == Space.World ? newLeft.x : monoBehaviour.transform.InverseTransformPoint(newLeft).x;
+                rect.xMin = space == Space.World ? newLeft.x : transform.InverseTransformPoint(newLeft).x;
             }
             else if (newRight != right)
             {
-                rect.xMax = space == Space.World ? newRight.x : monoBehaviour.transform.InverseTransformPoint(newRight).x;
+                rect.xMax = space == Space.World ? newRight.x : transform.InverseTransformPoint(newRight).x;
             }
             else if (newTopLeft != topLeft)
             {
-                Vector3 localTopLeft = space == Space.World ? newTopLeft : monoBehaviour.transform.InverseTransformPoint(newTopLeft);
+                Vector3 localTopLeft = space == Space.World ? newTopLeft : transform.InverseTransformPoint(newTopLeft);
                 rect.xMin = localTopLeft.x;
                 rect.yMax = localTopLeft.y;
             }
             else if (newBottomRight != bottomRight)
             {
-                Vector3 localBottomRight = space == Space.World ? newBottomRight : monoBehaviour.transform.InverseTransformPoint(newBottomRight);
+                Vector3 localBottomRight = space == Space.World ? newBottomRight : transform.InverseTransformPoint(newBottomRight);
                 rect.xMax = localBottomRight.x;
                 rect.yMin = localBottomRight.y;
             }
             else if (newScale!= scale)
             {
                 Vector2 tempCenter = rect.center;
-                rect.height = space == Space.World ? newScale.y : Vector3Extentions.UnScale(newScale,monoBehaviour.transform.localScale).y;
-                rect.width = space == Space.World ? newScale.x : Vector3Extentions.UnScale(newScale, monoBehaviour.transform.localScale).x;
+                rect.height = space == Space.World ? newScale.y : Vector3Extentions.UnScale(newScale,transform.localScale).y;
+                rect.width = space == Space.World ? newScale.x : Vector3Extentions.UnScale(newScale, transform.localScale).x;
 
                 rect.center = tempCenter;
             }
 
             //continue
-            fieldInfo.SetValue(monoBehaviour, rect);
+            fieldInfo.SetValue(target, rect);
         }
 
         // Draw the rect outline in the scene view
@@ -301,20 +365,33 @@ public class WidgetAttributesEditor : Editor
     private void ProcessLabelWidget(LabelAttribute labelAttribute, FieldInfo fieldInfo)
     {
         Space labelSpace = labelAttribute.space?? space;
-        Vector3 point = new Vector3();
-        if(TryUpdateVector3FromField(fieldInfo,target,ref point) == false) return;
+        Vector3 point = GetLocationFromField(fieldInfo,target);
 
         if(labelSpace == Space.Self){
-            point = monoBehaviour.transform.TransformPoint(point);
+            point = transform.TransformPoint(point);
         }
 
-        string name = labelAttribute.labelName?? fieldInfo.Name;
+        string name;
+        if(labelAttribute.labelName!= null)
+        {
+            name = labelAttribute.labelName;
+        }
+        else if(fieldInfo.GetValue(target) is ILabelName field)
+        {
+            name = field.GetNameForLabel();
+        }
+        else
+        {
+            name = fieldInfo.Name;
+        }
         GUIStyle style = new GUIStyle(GUI.skin.box);
-        style.normal.background = Texture2D.whiteTexture;
-        style.normal.textColor = Color.black; 
+        style.normal.background = labelBackgroundTexture;
+        style.normal.textColor = labelTextColor; 
         Handles.Label(point + labelScreenOffset * HandleUtility.GetHandleSize(point), new GUIContent(name), style);
     }
-    
+
+    #region Helper Methods
+
     private void DrawArrow(Vector3 startPoint, Vector3 endPoint)
     {
         Handles.color = lineColor;
@@ -323,94 +400,141 @@ public class WidgetAttributesEditor : Editor
 
         // Arrow Head Start Point half way.
         Vector3 arrowHeadBase = startPoint + direction/2;
-        float sizeModifier = HandleUtility.GetHandleSize(arrowHeadBase)/3;
-        
-        // Arrow Head End Points
-        Vector3 arrowHeadLeft = Quaternion.Euler(0, 0, 135) * direction.normalized * sizeModifier;
-        Vector3 arrowHeadRight = Quaternion.Euler(0, 0, 225) * direction.normalized * sizeModifier;
 
-        // Draw arrowhead
-        Handles.DrawLine(arrowHeadBase, arrowHeadBase + arrowHeadLeft, thickness);
-        Handles.DrawLine(arrowHeadBase, arrowHeadBase + arrowHeadRight, thickness);
+        Handles.ConeHandleCap(0,arrowHeadBase,Quaternion.LookRotation(direction,Vector3.up),HandleUtility.GetHandleSize(arrowHeadBase)/5,EventType.Repaint);
     }
 
-    #region Helper Methods
-    private bool TryUpdateVector3FromField(FieldInfo fieldInfo, object target, ref Vector3 vector)
+
+    private Quaternion GetQuaternionFromField(FieldInfo fieldInfo, object target,bool bottom = false)
     {
         object value = fieldInfo.GetValue(target);
-        if (value is Vector3 vec3)
-        {
-            vector = vec3;
-            return true;
-        }
-        else if (value is Vector2 vec2)
-        {
-            vector = (Vector3)vec2;
-            return true;
-        }
-        else if (value is float2 float2)
-        {
 
-            vector.x = float2.x;
-            vector.y = float2.y;
-            return true;
-        }
-        else if (value is float3 float3)
+        switch (value)
         {
-            vector = (Vector3)float3;
-            return true;
+            case IWidgetRotation field:
+                return field.GetRotationForWidget();
+
+            case Quaternion field:
+                return field;
+
+            default:
+                throw new InvalidOperationException($"Unsupported field type: {value.GetType()} for field {fieldInfo.Name}");
         }
-        else if (value is Vector3Int vec3int)
-        {
-            vector = (Vector3)vec3int;
-            return true;
-        }
-        else if (value is Vector2Int vec2int)
-        {
-            vector = (Vector3)(Vector2)vec2int;
-            return true;
-        }
-        // If the field is not supported
-        return false;
     }
-    private void TrySetFieldFromVector3(FieldInfo fieldInfo, object target, Vector3 vector)
+    private void SetFieldFromQuaternion(FieldInfo fieldInfo, object target, Quaternion rotation)
     {
-
         object value = fieldInfo.GetValue(target);
 
-        if (value is Vector3)
+        switch (value)
         {
-            fieldInfo.SetValue(target, vector);
-        }
-        else if (value is Vector2)
-        {
-            fieldInfo.SetValue(target, (Vector2)vector);
-        }
-        else if (value is float2)
-        {
-            
-            float2 float2Value = new float2(vector.x, vector.y);
-            fieldInfo.SetValue(target, float2Value);
-        }
-        else if (value is float3)
-        {
-            fieldInfo.SetValue(target, (float3)vector);
-        }
-        else if (value is Vector3Int vec3int)
-        {
-            vec3int.x = Mathf.RoundToInt(vector.x);
-            vec3int.y = Mathf.RoundToInt(vector.y);
-            vec3int.z =Mathf.RoundToInt(vector.z);
+            case IWidgetRotation _IWidgetRotation:
+                _IWidgetRotation.SetRotationfromWidget(rotation);
+                fieldInfo.SetValue(target, _IWidgetRotation);
+                break;
 
-            fieldInfo.SetValue(target, vec3int);
+            case Quaternion:
+                fieldInfo.SetValue(target, rotation);
+                break;
+            default:
+                throw new InvalidOperationException($"Unsupported field type: {value.GetType()} for field {fieldInfo.Name}");
         }
-        else if (value is Vector2Int vec2int)
+    }
+    private Vector3 GetLocationFromField(FieldInfo fieldInfo, object target,bool bottom = false)
+    {
+        object value = fieldInfo.GetValue(target);
+
+        switch (value)
         {
-            vec2int.x = Mathf.RoundToInt(vector.x);
-            vec2int.y = Mathf.RoundToInt(vector.y);
-            
-            fieldInfo.SetValue(target, vec2int);
+            case IWidgetLocation field:
+                return field.GetLocationForWidget();
+
+            case Vector3 vec3:
+                return vec3;
+
+            case Vector2 vec2:
+                return (Vector3)vec2;
+
+            case float2 float2:
+                return new Vector3(float2.x, float2.y, 0f);
+
+            case float3 float3:
+                return (Vector3)float3;
+
+            case Vector3Int vec3int:
+                return (Vector3)vec3int;
+
+            case Vector2Int vec2int:
+                return (Vector3)(Vector2)vec2int;
+
+            case Rect rect:
+                return bottom? new Vector3(rect.x,rect.yMin,0) : (Vector3)rect.center;
+
+            default:
+                throw new InvalidOperationException($"Unsupported field type: {value.GetType()} for field {fieldInfo.Name}");
         }
+    }
+    private void SetLocationFromVector3(FieldInfo fieldInfo, object target, Vector3 vector)
+    {
+        object value = fieldInfo.GetValue(target);
+
+        switch (value)
+        {
+            case IWidgetLocation _IWidgtLocation:
+                _IWidgtLocation.SetLocationFromWidget(vector);
+                fieldInfo.SetValue(target, _IWidgtLocation);
+                break;
+
+            case Vector3:
+                fieldInfo.SetValue(target, vector);
+                break;
+
+            case Vector2:
+                fieldInfo.SetValue(target, (Vector2)vector);
+                break;
+
+            case float2:
+                float2 float2Value = new float2(vector.x, vector.y);
+                fieldInfo.SetValue(target, float2Value);
+                break;
+
+            case float3:
+                fieldInfo.SetValue(target, (float3)vector);
+                break;
+
+            case Vector3Int vec3int:
+                vec3int.x = Mathf.RoundToInt(vector.x);
+                vec3int.y = Mathf.RoundToInt(vector.y);
+                vec3int.z = Mathf.RoundToInt(vector.z);
+                fieldInfo.SetValue(target, vec3int);
+                break;
+
+            case Vector2Int vec2int:
+                vec2int.x = Mathf.RoundToInt(vector.x);
+                vec2int.y = Mathf.RoundToInt(vector.y);
+                fieldInfo.SetValue(target, vec2int);
+                break;
+
+            default:
+                throw new InvalidOperationException($"Unsupported field type: {value.GetType()} for field {fieldInfo.Name}");
+        }
+    }
+
+    private Texture2D CreateSolidColorTexture(Color color)
+    {
+        Texture2D texture;
+        if (labelBackgroundTextureCache.TryGetValue(color,out texture))
+        {
+            return texture;
+        }
+        else
+        {
+            texture = new Texture2D(1, 1);
+            texture.SetPixel(0,0,color);
+            texture.Apply();
+            labelBackgroundTextureCache[color] = texture;
+            return texture;
+        }
+
     }
 
     #endregion
